@@ -1,0 +1,5 @@
+---
+# Override schedule for this host (Monday 03:30)
+cron_weekday: "1"
+cron_hour: "3"
+cron_minute: "30"

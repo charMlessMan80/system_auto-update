@@ -1,0 +1,75 @@
+---
+- name: Configure local mirror and schedule automatic system updates
+  hosts: servers
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Ensure backup directory for disabled repo files exists
+      ansible.builtin.file:
+        path: "{{ disabled_repos_backup_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Find existing repo files in /etc/yum.repos.d
+      ansible.builtin.find:
+        paths: /etc/yum.repos.d
+        patterns: "*.repo"
+        excludes: "{{ local_mirror_repo_dest | basename }}"
+        file_type: file
+      register: existing_repos
+
+    - name: Move existing repo files to backup directory (disable all repos)
+      ansible.builtin.command:
+        cmd: "mv {{ item.path }} {{ disabled_repos_backup_dir }}/"
+        removes: "{{ item.path }}"
+      loop: "{{ existing_repos.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      notify: Rebuild package manager cache
+
+    - name: Download repo file from local mirror
+      ansible.builtin.get_url:
+        url: "{{ local_mirror_repo_url }}"
+        dest: "{{ local_mirror_repo_dest }}"
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Rebuild package manager cache
+
+    - name: Deploy system update shell script
+      ansible.builtin.copy:
+        src: files/system-auto-update.sh
+        dest: "{{ update_script_path }}"
+        owner: root
+        group: root
+        mode: "0750"
+
+    - name: Ensure update log file exists
+      ansible.builtin.file:
+        path: "{{ update_log_file }}"
+        state: touch
+        owner: root
+        group: root
+        mode: "0640"
+        access_time: preserve
+        modification_time: preserve
+
+    - name: Schedule cron job to run the update script
+      ansible.builtin.cron:
+        name: "system auto-update"
+        user: root
+        minute: "{{ cron_minute }}"
+        hour: "{{ cron_hour }}"
+        day: "{{ cron_day }}"
+        month: "{{ cron_month }}"
+        weekday: "{{ cron_weekday }}"
+        job: "LOG_FILE={{ update_log_file }} {{ update_script_path }}"
+        cron_file: system-auto-update
+
+  handlers:
+    - name: Rebuild package manager cache
+      ansible.builtin.shell:
+        cmd: "{{ ansible_pkg_mgr }} clean all && {{ ansible_pkg_mgr }} makecache"

@@ -1,0 +1,4 @@
+---
+cron_weekday: "1"
+cron_hour: "3"
+cron_minute: "0"

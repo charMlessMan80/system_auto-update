@@ -1,0 +1,20 @@
+---
+# URL of the repo file hosted on the local mirror
+local_mirror_repo_url: "http://mirror.local.lan/repos/local-mirror.repo"
+
+# Where the repo file will be installed on the target
+local_mirror_repo_dest: "/etc/yum.repos.d/local-mirror.repo"
+
+# Backup directory for the repo files we disable
+disabled_repos_backup_dir: "/etc/yum.repos.d/disabled"
+
+# Update script
+update_script_path: "/usr/local/sbin/system-auto-update.sh"
+update_log_file: "/var/log/system-auto-update.log"
+
+# Cron schedule (default: every Tuesday at 03:00)
+cron_minute: "0"
+cron_hour: "3"
+cron_day: "*"
+cron_month: "*"
+cron_weekday: "2"
