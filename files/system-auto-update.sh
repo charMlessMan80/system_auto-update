@@ -2,6 +2,10 @@
 # Performs an unattended package update using the configured repositories.
 set -euo pipefail
 
+# cron runs with a minimal PATH that omits /usr/sbin and /sbin, where tools
+# such as grubby and shutdown live. Make sure they are reachable.
+export PATH="/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
+
 LOG_FILE="${LOG_FILE:-/var/log/system-auto-update.log}"
 LOCK_FILE="${LOCK_FILE:-/var/run/system-auto-update.lock}"
 
@@ -39,8 +43,14 @@ if [ -n "$LATEST_KERNEL" ] && [ "$RUNNING_KERNEL" != "$LATEST_KERNEL" ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') : kernel updated ($RUNNING_KERNEL -> $LATEST_KERNEL), rebooting."
     # Release the lock before rebooting so the next run is not blocked
     flock -u 9
-    grubby --set-default-index=0
-    grubby --update-kernel=ALL --default-kernel
+    # dnf/yum already sets the newest kernel as the default boot entry via
+    # grubby/kernel-install. If grubby is available, make the default explicit;
+    # otherwise just proceed with the reboot.
+    if command -v grubby >/dev/null 2>&1; then
+        grubby --set-default-index=0
+    else
+        echo "$(date '+%Y-%m-%d %H:%M:%S') : grubby not found, relying on package manager default boot entry."
+    fi
     /sbin/shutdown -r now "Rebooting to apply updated kernel"
 else
     echo "$(date '+%Y-%m-%d %H:%M:%S') : kernel unchanged ($RUNNING_KERNEL), no reboot required."
